@@ -1,4 +1,9 @@
 import streamlit as st
+from pathlib import Path
+
+# ==========================================================
+# PAGE CONFIGURATION
+# ==========================================================
 
 st.set_page_config(
     page_title="EduMentor AI",
@@ -7,158 +12,385 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ==========================================================
+# CUSTOM CSS
+# ==========================================================
+
 st.markdown("""
 <style>
+
 .stApp {
-    background: linear-gradient(135deg,#020617,#0F172A,#111827);
+    background: linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 45%, #ECFDF5 100%);
 }
 
+/* Main container */
+.main .block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    max-width: 1300px;
+}
+
+/* Sidebar */
 [data-testid="stSidebar"] {
-    background-color:#0F172A;
+    background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+    border-right: 1px solid rgba(255,255,255,0.12);
 }
 
 [data-testid="stSidebar"] * {
     color: #F8FAFC !important;
 }
 
+/* Radio buttons */
+[data-testid="stSidebar"] label {
+    color: #E2E8F0 !important;
+}
+
+/* Headings */
 .hero-title {
-    color:#FFFFFF;
-    font-size:56px;
-    font-weight:800;
-    margin-bottom:12px;
+    color: #0F172A;
+    font-size: 58px;
+    font-weight: 850;
+    line-height: 1.08;
+    margin-bottom: 16px;
 }
 
 .hero-subtitle {
-    color:#E2E8F0;
-    font-size:21px;
-    margin-bottom:35px;
+    color: #334155;
+    font-size: 21px;
+    line-height: 1.6;
+    max-width: 900px;
+    margin-bottom: 32px;
 }
 
-.feature-card {
-    background:rgba(255,255,255,0.10);
-    border-radius:20px;
-    padding:28px;
-    border:1px solid rgba(255,255,255,0.18);
-    min-height:150px;
+.section-title {
+    color: #0F172A;
+    font-size: 34px;
+    font-weight: 800;
+    margin-top: 36px;
+    margin-bottom: 20px;
 }
 
-.feature-title {
-    color:#FFFFFF;
-    font-size:23px;
-    font-weight:700;
-    margin-bottom:12px;
+/* Cards */
+.premium-card {
+    background: rgba(255,255,255,0.92);
+    border: 1px solid rgba(15,23,42,0.08);
+    border-radius: 24px;
+    padding: 28px;
+    min-height: 170px;
+    box-shadow: 0 18px 45px rgba(15,23,42,0.08);
 }
 
-.feature-text {
-    color:#E2E8F0;
-    font-size:16px;
-    line-height:1.6;
+.premium-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 55px rgba(15,23,42,0.12);
+    transition: all 0.25s ease;
 }
 
-.vision-title {
-    color:#FFFFFF;
-    font-size:32px;
-    font-weight:800;
-    margin-top:35px;
-    margin-bottom:20px;
+.card-title {
+    color: #0F172A;
+    font-size: 23px;
+    font-weight: 800;
+    margin-bottom: 12px;
 }
 
-.vision-text {
-    color:#E2E8F0 !important;
-    font-size:18px;
-    line-height:1.8;
+.card-text {
+    color: #475569;
+    font-size: 16px;
+    line-height: 1.7;
 }
 
-.vision-text li {
-    color:#FFFFFF !important;
-    font-size:17px;
-    margin-bottom:8px;
+/* Upload card */
+.upload-card {
+    background: #FFFFFF;
+    border: 2px dashed rgba(16,185,129,0.45);
+    border-radius: 26px;
+    padding: 32px;
+    margin-bottom: 22px;
+    box-shadow: 0 16px 40px rgba(15,23,42,0.08);
 }
 
+.upload-title {
+    color: #0F172A;
+    font-size: 26px;
+    font-weight: 800;
+    margin-bottom: 10px;
+}
+
+.upload-text {
+    color: #475569;
+    font-size: 17px;
+    line-height: 1.6;
+}
+
+/* Success box */
+.upload-info {
+    background: rgba(16,185,129,0.10);
+    border: 1px solid rgba(16,185,129,0.35);
+    border-radius: 20px;
+    padding: 24px;
+    margin-top: 20px;
+}
+
+/* Alerts */
 [data-testid="stAlert"] {
-    background-color: rgba(16,185,129,0.12);
+    border-radius: 16px;
     border: 1px solid rgba(16,185,129,0.35);
 }
 
 [data-testid="stAlert"] * {
-    color: #F8FAFC !important;
+    color: #0F172A !important;
 }
+
+/* Buttons */
+.stButton > button {
+    background: linear-gradient(135deg, #2563EB, #10B981);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    padding: 0.75rem 1.3rem;
+    font-weight: 700;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(37,99,235,0.25);
+}
+
+/* File uploader */
+[data-testid="stFileUploader"] {
+    background: #FFFFFF;
+    border-radius: 18px;
+    padding: 10px;
+    border: 1px solid rgba(15,23,42,0.08);
+}
+
+/* Hide Streamlit default menu spacing feel */
+header {
+    background: transparent !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
-st.sidebar.title("🎓 EduMentor AI")
-st.sidebar.write("AI Learning Assistant")
+# ==========================================================
+# FILE STORAGE
+# ==========================================================
+
+UPLOAD_FOLDER = Path("data/uploads")
+
+
+def save_uploaded_file(uploaded_file):
+    UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+
+    file_path = UPLOAD_FOLDER / uploaded_file.name
+
+    with open(file_path, "wb") as file:
+        file.write(uploaded_file.getbuffer())
+
+    return file_path
+
+
+# ==========================================================
+# SIDEBAR
+# ==========================================================
+
+st.sidebar.markdown("## 🎓 EduMentor AI")
+st.sidebar.markdown("AI Learning Assistant")
 st.sidebar.divider()
 
 page = st.sidebar.radio(
     "Navigation",
     [
-        "🏠 Home",
+        "🏠 Dashboard",
         "📂 Upload Notes",
-        "📖 Explain Notes",
-        "📝 Summaries",
+        "🤖 AI Explanation",
+        "📝 Summary",
         "❓ MCQs",
         "🧠 Flashcards",
-        "📚 Resources"
+        "🎤 Viva",
+        "📚 Resources",
+        "⚙ Settings"
     ],
-    key="main_navigation"
+    key="navigation"
 )
 
-if page == "🏠 Home":
-    st.markdown('<div class="hero-title">EduMentor AI</div>', unsafe_allow_html=True)
+# ==========================================================
+# DASHBOARD PAGE
+# ==========================================================
+
+if page == "🏠 Dashboard":
+
     st.markdown(
-        '<div class="hero-subtitle">AI Learning Assistant for Indian University Students</div>',
+        """
+        <div class="hero-title">
+            Learn Smarter.<br>
+            Understand Faster.
+        </div>
+        """,
         unsafe_allow_html=True
     )
+
+    st.markdown(
+        """
+        <div class="hero-subtitle">
+            Upload your university notes and let EduMentor AI explain topics,
+            generate summaries, create MCQs, build flashcards, prepare viva questions,
+            and recommend free learning resources.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown('<div class="section-title">Core Features</div>', unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.markdown("""
-        <div class="feature-card">
-            <div class="feature-title">📂 Upload Notes</div>
-            <div class="feature-text">Upload PDF, DOCX, PPTX, TXT or Images.</div>
+        <div class="premium-card">
+            <div class="card-title">🤖 AI Explanation</div>
+            <div class="card-text">
+                Understand difficult university topics in simple beginner-friendly language.
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
     with col2:
         st.markdown("""
-        <div class="feature-card">
-            <div class="feature-title">🤖 AI Explanation</div>
-            <div class="feature-text">Understand difficult topics in simple language.</div>
+        <div class="premium-card">
+            <div class="card-title">📝 Smart Summary</div>
+            <div class="card-text">
+                Convert long notes into clean summaries, key points, and revision notes.
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
     with col3:
         st.markdown("""
-        <div class="feature-card">
-            <div class="feature-title">📝 Exam Preparation</div>
-            <div class="feature-text">Generate summaries, MCQs, flashcards and viva questions.</div>
+        <div class="premium-card">
+            <div class="card-title">❓ Exam Practice</div>
+            <div class="card-text">
+                Generate MCQs, flashcards, viva questions, and important exam questions.
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
-    st.divider()
-
-    st.markdown('<div class="vision-title">🚀 Vision</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Future Vision</div>', unsafe_allow_html=True)
 
     st.markdown("""
-    <div class="vision-text">
-    EduMentor AI aims to become India's smartest AI learning platform for college students.
-    <br><br>
-    Students will be able to upload their notes and instantly receive:
-    <ul>
-        <li>📖 Easy-to-understand explanations</li>
-        <li>📝 Smart summaries</li>
-        <li>🎯 Important questions</li>
-        <li>❓ MCQs</li>
-        <li>🧠 Flashcards</li>
-        <li>🎤 Viva questions</li>
-        <li>📚 Free learning resources</li>
-    </ul>
+    <div class="premium-card">
+        <div class="card-text">
+            EduMentor AI will start with SPPU and AI & Data Science students,
+            then expand to Computer Engineering, IT, Mechanical, Civil, Electronics,
+            MBA, BBA, BCA, MCA, Pharmacy, Law, Medical, and more Indian university streams.
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
+# ==========================================================
+# UPLOAD NOTES PAGE
+# ==========================================================
+
+elif page == "📂 Upload Notes":
+
+    st.markdown(
+        """
+        <div class="hero-title">
+            Upload Notes
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <div class="hero-subtitle">
+            Upload PDFs, DOCX files, PPTs, TXT files, or images.
+            EduMentor AI will prepare them for explanation, summaries, MCQs, flashcards, and revision.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("""
+    <div class="upload-card">
+        <div class="upload-title">☁️ Drag & Drop Study Material</div>
+        <div class="upload-text">
+            Supported formats: PDF • DOCX • PPTX • TXT • PNG • JPG • JPEG
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    uploaded_file = st.file_uploader(
+        "Choose your study material",
+        type=["pdf", "docx", "pptx", "txt", "png", "jpg", "jpeg"]
+    )
+
+    if uploaded_file is not None:
+        saved_path = save_uploaded_file(uploaded_file)
+
+        st.success("✅ File uploaded and saved successfully!")
+
+        st.markdown('<div class="section-title">File Details</div>', unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.markdown(f"""
+            <div class="premium-card">
+                <div class="card-title">📄 File Name</div>
+                <div class="card-text">{uploaded_file.name}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            st.markdown(f"""
+            <div class="premium-card">
+                <div class="card-title">📦 File Size</div>
+                <div class="card-text">{round(uploaded_file.size / 1024, 2)} KB</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col3:
+            st.markdown(f"""
+            <div class="premium-card">
+                <div class="card-title">🧾 File Type</div>
+                <div class="card-text">{uploaded_file.type}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div class="upload-info">
+            <div class="card-title">✅ Saved Location</div>
+            <div class="card-text">{saved_path}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="section-title">Next Actions</div>', unsafe_allow_html=True)
+
+        col_a, col_b, col_c, col_d = st.columns(4)
+
+        with col_a:
+            st.button("🤖 Explain")
+
+        with col_b:
+            st.button("📝 Summary")
+
+        with col_c:
+            st.button("❓ MCQs")
+
+        with col_d:
+            st.button("🧠 Flashcards")
+
+    else:
+        st.info("Please upload a file to continue.")
+
+# ==========================================================
+# PLACEHOLDER PAGES
+# ==========================================================
+
 else:
+
     st.markdown(
         f"""
         <div class="hero-title">
@@ -171,11 +403,10 @@ else:
     st.markdown(
         """
         <div class="hero-subtitle">
-            This module is currently under development.
-            It will be available in the upcoming lessons as we build EduMentor AI step by step.
+            This module will be developed in upcoming lessons.
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    st.info("🚧 This module will be developed in upcoming lessons.")
+    st.info("🚧 Module under development.")
