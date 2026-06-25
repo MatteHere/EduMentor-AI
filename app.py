@@ -1,9 +1,6 @@
 import streamlit as st
 from pathlib import Path
-
-# ==========================================================
-# PAGE CONFIGURATION
-# ==========================================================
+import pdfplumber
 
 st.set_page_config(
     page_title="EduMentor AI",
@@ -12,40 +9,26 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ==========================================================
-# CUSTOM CSS
-# ==========================================================
-
 st.markdown("""
 <style>
-
 .stApp {
     background: linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 45%, #ECFDF5 100%);
 }
 
-/* Main container */
 .main .block-container {
     padding-top: 2rem;
     padding-bottom: 2rem;
     max-width: 1300px;
 }
 
-/* Sidebar */
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
-    border-right: 1px solid rgba(255,255,255,0.12);
 }
 
 [data-testid="stSidebar"] * {
     color: #F8FAFC !important;
 }
 
-/* Radio buttons */
-[data-testid="stSidebar"] label {
-    color: #E2E8F0 !important;
-}
-
-/* Headings */
 .hero-title {
     color: #0F172A;
     font-size: 58px;
@@ -70,7 +53,6 @@ st.markdown("""
     margin-bottom: 20px;
 }
 
-/* Cards */
 .premium-card {
     background: rgba(255,255,255,0.92);
     border: 1px solid rgba(15,23,42,0.08);
@@ -78,12 +60,6 @@ st.markdown("""
     padding: 28px;
     min-height: 170px;
     box-shadow: 0 18px 45px rgba(15,23,42,0.08);
-}
-
-.premium-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 22px 55px rgba(15,23,42,0.12);
-    transition: all 0.25s ease;
 }
 
 .card-title {
@@ -99,7 +75,6 @@ st.markdown("""
     line-height: 1.7;
 }
 
-/* Upload card */
 .upload-card {
     background: #FFFFFF;
     border: 2px dashed rgba(16,185,129,0.45);
@@ -122,7 +97,6 @@ st.markdown("""
     line-height: 1.6;
 }
 
-/* Success box */
 .upload-info {
     background: rgba(16,185,129,0.10);
     border: 1px solid rgba(16,185,129,0.35);
@@ -131,7 +105,19 @@ st.markdown("""
     margin-top: 20px;
 }
 
-/* Alerts */
+.preview-box {
+    background: #FFFFFF;
+    border: 1px solid rgba(15,23,42,0.10);
+    border-radius: 20px;
+    padding: 24px;
+    max-height: 420px;
+    overflow-y: auto;
+    box-shadow: 0 14px 35px rgba(15,23,42,0.08);
+    color: #0F172A;
+    white-space: pre-wrap;
+    line-height: 1.7;
+}
+
 [data-testid="stAlert"] {
     border-radius: 16px;
     border: 1px solid rgba(16,185,129,0.35);
@@ -141,7 +127,6 @@ st.markdown("""
     color: #0F172A !important;
 }
 
-/* Buttons */
 .stButton > button {
     background: linear-gradient(135deg, #2563EB, #10B981);
     color: white;
@@ -151,12 +136,6 @@ st.markdown("""
     font-weight: 700;
 }
 
-.stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 30px rgba(37,99,235,0.25);
-}
-
-/* File uploader */
 [data-testid="stFileUploader"] {
     background: #FFFFFF;
     border-radius: 18px;
@@ -164,25 +143,39 @@ st.markdown("""
     border: 1px solid rgba(15,23,42,0.08);
 }
 
-/* Hide Streamlit default menu spacing feel */
 header {
     background: transparent !important;
 }
-
 </style>
 """, unsafe_allow_html=True)
-
-# ==========================================================
-# FILE STORAGE
-# ==========================================================
 
 UPLOAD_FOLDER = Path("data/uploads")
 
 
-def save_uploaded_file(uploaded_file):
+def get_unique_file_path(file_name):
     UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
-    file_path = UPLOAD_FOLDER / uploaded_file.name
+    original_path = UPLOAD_FOLDER / file_name
+
+    if not original_path.exists():
+        return original_path
+
+    file_stem = original_path.stem
+    file_suffix = original_path.suffix
+    counter = 1
+
+    while True:
+        new_file_name = f"{file_stem}_{counter}{file_suffix}"
+        new_file_path = UPLOAD_FOLDER / new_file_name
+
+        if not new_file_path.exists():
+            return new_file_path
+
+        counter += 1
+
+
+def save_uploaded_file(uploaded_file):
+    file_path = get_unique_file_path(uploaded_file.name)
 
     with open(file_path, "wb") as file:
         file.write(uploaded_file.getbuffer())
@@ -190,9 +183,18 @@ def save_uploaded_file(uploaded_file):
     return file_path
 
 
-# ==========================================================
-# SIDEBAR
-# ==========================================================
+def extract_text_from_pdf(file_path):
+    extracted_text = ""
+
+    with pdfplumber.open(file_path) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+
+            if text:
+                extracted_text += text + "\n\n"
+
+    return extracted_text.strip()
+
 
 st.sidebar.markdown("## 🎓 EduMentor AI")
 st.sidebar.markdown("AI Learning Assistant")
@@ -214,12 +216,7 @@ page = st.sidebar.radio(
     key="navigation"
 )
 
-# ==========================================================
-# DASHBOARD PAGE
-# ==========================================================
-
 if page == "🏠 Dashboard":
-
     st.markdown(
         """
         <div class="hero-title">
@@ -275,32 +272,8 @@ if page == "🏠 Dashboard":
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown('<div class="section-title">Future Vision</div>', unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="premium-card">
-        <div class="card-text">
-            EduMentor AI will start with SPPU and AI & Data Science students,
-            then expand to Computer Engineering, IT, Mechanical, Civil, Electronics,
-            MBA, BBA, BCA, MCA, Pharmacy, Law, Medical, and more Indian university streams.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ==========================================================
-# UPLOAD NOTES PAGE
-# ==========================================================
-
 elif page == "📂 Upload Notes":
-
-    st.markdown(
-        """
-        <div class="hero-title">
-            Upload Notes
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="hero-title">Upload Notes</div>', unsafe_allow_html=True)
 
     st.markdown(
         """
@@ -366,40 +339,33 @@ elif page == "📂 Upload Notes":
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown('<div class="section-title">Next Actions</div>', unsafe_allow_html=True)
+        if saved_path.suffix.lower() == ".pdf":
+            st.markdown('<div class="section-title">Extracted Text Preview</div>', unsafe_allow_html=True)
 
-        col_a, col_b, col_c, col_d = st.columns(4)
+            with st.spinner("Extracting text from PDF..."):
+                extracted_text = extract_text_from_pdf(saved_path)
 
-        with col_a:
-            st.button("🤖 Explain")
+            if extracted_text:
+                preview_text = extracted_text[:4000]
 
-        with col_b:
-            st.button("📝 Summary")
+                st.markdown(
+                    f"""
+                    <div class="preview-box">
+                    {preview_text}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
-        with col_c:
-            st.button("❓ MCQs")
-
-        with col_d:
-            st.button("🧠 Flashcards")
+                st.success("✅ PDF text extracted successfully!")
+            else:
+                st.warning("No readable text was found in this PDF.")
 
     else:
         st.info("Please upload a file to continue.")
 
-# ==========================================================
-# PLACEHOLDER PAGES
-# ==========================================================
-
 else:
-
-    st.markdown(
-        f"""
-        <div class="hero-title">
-            {page}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
+    st.markdown(f'<div class="hero-title">{page}</div>', unsafe_allow_html=True)
     st.markdown(
         """
         <div class="hero-subtitle">
@@ -408,5 +374,4 @@ else:
         """,
         unsafe_allow_html=True
     )
-
     st.info("🚧 Module under development.")
