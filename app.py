@@ -1,5 +1,6 @@
 import streamlit as st
 from pathlib import Path
+import re
 import pdfplumber
 from docx import Document
 from pptx import Presentation
@@ -156,7 +157,6 @@ UPLOAD_FOLDER = Path("data/uploads")
 
 def get_unique_file_path(file_name):
     UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
-
     original_path = UPLOAD_FOLDER / file_name
 
     if not original_path.exists():
@@ -183,6 +183,15 @@ def save_uploaded_file(uploaded_file):
         file.write(uploaded_file.getbuffer())
 
     return file_path
+
+
+def clean_text(text):
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = "\n".join(line.strip() for line in text.split("\n"))
+
+    return text.strip()
 
 
 def extract_text_from_pdf(file_path):
@@ -235,18 +244,17 @@ def process_document(file_path):
     suffix = file_path.suffix.lower()
 
     if suffix == ".pdf":
-        return extract_text_from_pdf(file_path)
+        text = extract_text_from_pdf(file_path)
+    elif suffix == ".txt":
+        text = extract_text_from_txt(file_path)
+    elif suffix == ".docx":
+        text = extract_text_from_docx(file_path)
+    elif suffix == ".pptx":
+        text = extract_text_from_pptx(file_path)
+    else:
+        text = ""
 
-    if suffix == ".txt":
-        return extract_text_from_txt(file_path)
-
-    if suffix == ".docx":
-        return extract_text_from_docx(file_path)
-
-    if suffix == ".pptx":
-        return extract_text_from_pptx(file_path)
-
-    return ""
+    return clean_text(text)
 
 
 st.sidebar.markdown("## 🎓 EduMentor AI")
@@ -392,11 +400,11 @@ elif page == "📂 Upload Notes":
         </div>
         """, unsafe_allow_html=True)
 
-        with st.spinner("Processing document..."):
+        with st.spinner("Processing and cleaning document..."):
             extracted_text = process_document(saved_path)
 
         if extracted_text:
-            st.markdown('<div class="section-title">Extracted Text Preview</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-title">Cleaned Text Preview</div>', unsafe_allow_html=True)
 
             preview_text = extracted_text[:4000]
 
@@ -409,7 +417,7 @@ elif page == "📂 Upload Notes":
                 unsafe_allow_html=True
             )
 
-            st.success("✅ Document processed successfully!")
+            st.success("✅ Document processed and cleaned successfully!")
 
         elif saved_path.suffix.lower() in [".pdf", ".txt", ".docx", ".pptx"]:
             st.warning("No readable text was found in this file.")
