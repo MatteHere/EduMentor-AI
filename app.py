@@ -196,6 +196,13 @@ def extract_text_from_pdf(file_path):
     return extracted_text.strip()
 
 
+def extract_text_from_txt(file_path):
+    with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
+        text = file.read()
+
+    return text.strip()
+
+
 st.sidebar.markdown("## 🎓 EduMentor AI")
 st.sidebar.markdown("AI Learning Assistant")
 st.sidebar.divider()
@@ -339,27 +346,34 @@ elif page == "📂 Upload Notes":
         </div>
         """, unsafe_allow_html=True)
 
-        if saved_path.suffix.lower() == ".pdf":
-            st.markdown('<div class="section-title">Extracted Text Preview</div>', unsafe_allow_html=True)
+        extracted_text = ""
 
+        if saved_path.suffix.lower() == ".pdf":
             with st.spinner("Extracting text from PDF..."):
                 extracted_text = extract_text_from_pdf(saved_path)
 
-            if extracted_text:
-                preview_text = extracted_text[:4000]
+        elif saved_path.suffix.lower() == ".txt":
+            with st.spinner("Reading TXT file..."):
+                extracted_text = extract_text_from_txt(saved_path)
 
-                st.markdown(
-                    f"""
-                    <div class="preview-box">
-                    {preview_text}
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+        if extracted_text:
+            st.markdown('<div class="section-title">Extracted Text Preview</div>', unsafe_allow_html=True)
 
-                st.success("✅ PDF text extracted successfully!")
-            else:
-                st.warning("No readable text was found in this PDF.")
+            preview_text = extracted_text[:4000]
+
+            st.markdown(
+                f"""
+                <div class="preview-box">
+                {preview_text}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.success("✅ Text extracted successfully!")
+
+        elif saved_path.suffix.lower() in [".pdf", ".txt"]:
+            st.warning("No readable text was found in this file.")
 
     else:
         st.info("Please upload a file to continue.")
