@@ -1,6 +1,8 @@
 import streamlit as st
 from pathlib import Path
 import pdfplumber
+from docx import Document
+from pptx import Presentation
 
 st.set_page_config(
     page_title="EduMentor AI",
@@ -198,9 +200,53 @@ def extract_text_from_pdf(file_path):
 
 def extract_text_from_txt(file_path):
     with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
-        text = file.read()
+        return file.read().strip()
 
-    return text.strip()
+
+def extract_text_from_docx(file_path):
+    document = Document(file_path)
+    extracted_text = ""
+
+    for paragraph in document.paragraphs:
+        if paragraph.text.strip():
+            extracted_text += paragraph.text + "\n\n"
+
+    return extracted_text.strip()
+
+
+def extract_text_from_pptx(file_path):
+    presentation = Presentation(file_path)
+    extracted_text = ""
+
+    for slide_number, slide in enumerate(presentation.slides, start=1):
+        slide_text = ""
+
+        for shape in slide.shapes:
+            if hasattr(shape, "text") and shape.text.strip():
+                slide_text += shape.text + "\n"
+
+        if slide_text.strip():
+            extracted_text += f"Slide {slide_number}:\n{slide_text}\n\n"
+
+    return extracted_text.strip()
+
+
+def process_document(file_path):
+    suffix = file_path.suffix.lower()
+
+    if suffix == ".pdf":
+        return extract_text_from_pdf(file_path)
+
+    if suffix == ".txt":
+        return extract_text_from_txt(file_path)
+
+    if suffix == ".docx":
+        return extract_text_from_docx(file_path)
+
+    if suffix == ".pptx":
+        return extract_text_from_pptx(file_path)
+
+    return ""
 
 
 st.sidebar.markdown("## 🎓 EduMentor AI")
@@ -346,15 +392,8 @@ elif page == "📂 Upload Notes":
         </div>
         """, unsafe_allow_html=True)
 
-        extracted_text = ""
-
-        if saved_path.suffix.lower() == ".pdf":
-            with st.spinner("Extracting text from PDF..."):
-                extracted_text = extract_text_from_pdf(saved_path)
-
-        elif saved_path.suffix.lower() == ".txt":
-            with st.spinner("Reading TXT file..."):
-                extracted_text = extract_text_from_txt(saved_path)
+        with st.spinner("Processing document..."):
+            extracted_text = process_document(saved_path)
 
         if extracted_text:
             st.markdown('<div class="section-title">Extracted Text Preview</div>', unsafe_allow_html=True)
@@ -370,10 +409,13 @@ elif page == "📂 Upload Notes":
                 unsafe_allow_html=True
             )
 
-            st.success("✅ Text extracted successfully!")
+            st.success("✅ Document processed successfully!")
 
-        elif saved_path.suffix.lower() in [".pdf", ".txt"]:
+        elif saved_path.suffix.lower() in [".pdf", ".txt", ".docx", ".pptx"]:
             st.warning("No readable text was found in this file.")
+
+        else:
+            st.info("Text extraction for images will be added in the OCR module.")
 
     else:
         st.info("Please upload a file to continue.")
