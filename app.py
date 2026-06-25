@@ -127,25 +127,6 @@ st.markdown("""
     line-height: 1.7;
 }
 
-.ai-output {
-    background: #FFFFFF;
-    border-left: 6px solid #10B981;
-    border-radius: 20px;
-    padding: 28px;
-    box-shadow: 0 14px 35px rgba(15,23,42,0.08);
-    color: #0F172A;
-    line-height: 1.8;
-}
-
-.ai-output h1, .ai-output h2, .ai-output h3 {
-    color: #0F172A;
-}
-
-.ai-output p, .ai-output li {
-    color: #334155;
-    font-size: 17px;
-}
-
 [data-testid="stAlert"] {
     border-radius: 16px;
     border: 1px solid rgba(16,185,129,0.35);
@@ -177,7 +158,133 @@ header {
 </style>
 """, unsafe_allow_html=True)
 
+
 UPLOAD_FOLDER = Path("data/uploads")
+
+
+PROMPTS = {
+    "explain": """
+You are EduMentor AI, an expert AI tutor for Indian university students.
+
+Create a clear, beginner-friendly explanation.
+
+Use proper Markdown formatting.
+
+Format:
+
+# 📘 Topic Overview
+
+# 🧠 Simple Explanation
+
+# 🔑 Important Concepts
+
+Use this format for each concept:
+
+## Concept Name
+**Meaning:**  
+Explain the concept simply.
+
+**Why it is important:**  
+Explain importance.
+
+**Example:**  
+Give a real-life or technical example.
+
+# 📝 Exam Tips
+
+# ⚡ Quick Revision Points
+""",
+
+    "summary": """
+Create a clean exam-focused summary.
+
+Use proper Markdown formatting.
+
+Format:
+
+# 📝 Short Summary
+
+# 📚 Detailed Summary
+
+# 🔑 Key Points
+
+# 📌 Important Terms
+
+# ⚡ Quick Revision Notes
+""",
+
+    "mcq": """
+Generate 15 MCQs from the uploaded notes.
+
+Use this exact format:
+
+# ❓ MCQs
+
+## Question 1
+
+**Question:**  
+Write the question here.
+
+**Options:**  
+A) Option 1  
+B) Option 2  
+C) Option 3  
+D) Option 4  
+
+**Correct Answer:**  
+A/B/C/D
+
+**Explanation:**  
+Explain why the answer is correct.
+
+Repeat the same clean format for all questions.
+""",
+
+    "flashcards": """
+Create flashcards from the uploaded notes.
+
+Use this exact format:
+
+# 🧠 Flashcards
+
+## Flashcard 1
+
+**Question:**  
+Write the question here.
+
+**Answer:**  
+Write the answer clearly here.
+
+**Key Point:**  
+Mention the most important point to remember.
+
+Repeat this format for all flashcards.
+""",
+
+    "viva": """
+Generate viva questions and answers from the uploaded notes.
+
+Use this exact format:
+
+# 🎤 Viva Questions
+
+## Question 1
+
+**Question:**  
+Write the viva question here.
+
+**Answer:**  
+Write the answer clearly below the question.
+
+**Important Point:**  
+Mention what the student should remember.
+
+Repeat this format for all viva questions.
+
+# 📌 Important Viva Topics
+List important topics for oral exam preparation.
+"""
+}
 
 
 def get_unique_file_path(file_name):
@@ -281,7 +388,7 @@ def process_document(file_path):
     return clean_text(text)
 
 
-def generate_ai_explanation(text):
+def generate_ai_response(mode, text):
     api_key = os.getenv("GEMINI_API_KEY")
 
     if not api_key:
@@ -292,41 +399,7 @@ def generate_ai_explanation(text):
     safe_text = text[:12000]
 
     prompt = f"""
-You are EduMentor AI, an expert AI learning assistant for Indian university students.
-
-Your task:
-Explain the uploaded notes in simple, beginner-friendly language.
-
-Rules:
-- Do NOT just repeat the notes.
-- Explain concepts clearly.
-- Use simple language suitable for college students.
-- Add real-life examples.
-- Add exam-oriented points.
-- Add important definitions.
-- Add key takeaways.
-- Organize the answer with clear headings.
-- If the notes contain multiple topics, explain them topic-wise.
-
-Format the answer like this:
-
-# Topic Overview
-Explain what the uploaded notes are mainly about.
-
-# Simple Explanation
-Explain the concepts in easy language.
-
-# Important Concepts
-List and explain important concepts.
-
-# Real-Life Examples
-Give examples where useful.
-
-# Exam Tips
-Mention what students should remember for exams.
-
-# Quick Revision Points
-Give short bullet points for revision.
+{PROMPTS[mode]}
 
 Uploaded Notes:
 {safe_text}
@@ -339,8 +412,52 @@ Uploaded Notes:
         )
         return response.text
 
-    except Exception as error:
-        return f"❌ Gemini error: {error}"
+    except Exception:
+        return (
+            "⚠️ **Gemini is currently busy.**\n\n"
+            "The AI service is experiencing high demand right now. "
+            "Please wait 15–30 seconds and try again. "
+            "Your uploaded notes are safe."
+        )
+
+
+def render_ai_page(title, subtitle, mode, button_text):
+    st.markdown(f'<div class="hero-title">{title}</div>', unsafe_allow_html=True)
+
+    st.markdown(
+        f"""
+        <div class="hero-subtitle">
+            {subtitle}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if st.session_state["extracted_text"]:
+        st.markdown('<div class="section-title">Uploaded Document</div>', unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div class="premium-card">
+            <div class="card-title">📄 {st.session_state["uploaded_file_name"]}</div>
+            <div class="card-text">
+                Your document is processed and ready.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button(button_text):
+            with st.spinner("EduMentor AI is generating your result..."):
+                st.session_state["ai_outputs"][mode] = generate_ai_response(
+                    mode,
+                    st.session_state["extracted_text"]
+                )
+
+        if st.session_state["ai_outputs"].get(mode):
+            st.markdown('<div class="section-title">Generated Output</div>', unsafe_allow_html=True)
+            st.markdown(st.session_state["ai_outputs"][mode])
+
+    else:
+        st.warning("Please upload and process a document first from the Upload Notes page.")
 
 
 if "extracted_text" not in st.session_state:
@@ -349,8 +466,8 @@ if "extracted_text" not in st.session_state:
 if "uploaded_file_name" not in st.session_state:
     st.session_state["uploaded_file_name"] = ""
 
-if "ai_explanation" not in st.session_state:
-    st.session_state["ai_explanation"] = ""
+if "ai_outputs" not in st.session_state:
+    st.session_state["ai_outputs"] = {}
 
 
 st.sidebar.markdown("## 🎓 EduMentor AI")
@@ -372,6 +489,7 @@ page = st.sidebar.radio(
     ],
     key="navigation"
 )
+
 
 if page == "🏠 Dashboard":
     st.markdown(
@@ -404,7 +522,7 @@ if page == "🏠 Dashboard":
         <div class="premium-card">
             <div class="card-title">🤖 AI Explanation</div>
             <div class="card-text">
-                Understand difficult university topics in simple beginner-friendly language.
+                Understand difficult university topics in beginner-friendly language.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -414,7 +532,7 @@ if page == "🏠 Dashboard":
         <div class="premium-card">
             <div class="card-title">📝 Smart Summary</div>
             <div class="card-text">
-                Convert long notes into clean summaries, key points, and revision notes.
+                Convert long notes into summaries, key points, and revision notes.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -424,10 +542,11 @@ if page == "🏠 Dashboard":
         <div class="premium-card">
             <div class="card-title">❓ Exam Practice</div>
             <div class="card-text">
-                Generate MCQs, flashcards, viva questions, and important exam questions.
+                Generate MCQs, flashcards, viva questions, and exam questions.
             </div>
         </div>
         """, unsafe_allow_html=True)
+
 
 elif page == "📂 Upload Notes":
     st.markdown('<div class="hero-title">Upload Notes</div>', unsafe_allow_html=True)
@@ -461,63 +580,26 @@ elif page == "📂 Upload Notes":
 
         st.success("✅ File uploaded and saved successfully!")
 
-        st.markdown('<div class="section-title">File Details</div>', unsafe_allow_html=True)
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.markdown(f"""
-            <div class="premium-card">
-                <div class="card-title">📄 File Name</div>
-                <div class="card-text">{uploaded_file.name}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col2:
-            st.markdown(f"""
-            <div class="premium-card">
-                <div class="card-title">📦 File Size</div>
-                <div class="card-text">{round(uploaded_file.size / 1024, 2)} KB</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col3:
-            st.markdown(f"""
-            <div class="premium-card">
-                <div class="card-title">🧾 File Type</div>
-                <div class="card-text">{uploaded_file.type}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown(f"""
-        <div class="upload-info">
-            <div class="card-title">✅ Saved Location</div>
-            <div class="card-text">{saved_path}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
         with st.spinner("Processing and cleaning document..."):
             extracted_text = process_document(saved_path)
 
         if extracted_text:
             st.session_state["extracted_text"] = extracted_text
             st.session_state["uploaded_file_name"] = uploaded_file.name
-            st.session_state["ai_explanation"] = ""
+            st.session_state["ai_outputs"] = {}
 
             st.markdown('<div class="section-title">Cleaned Text Preview</div>', unsafe_allow_html=True)
-
-            preview_text = extracted_text[:4000]
 
             st.markdown(
                 f"""
                 <div class="preview-box">
-                {preview_text}
+                {extracted_text[:4000]}
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-            st.success("✅ Document processed and stored for AI Explanation!")
+            st.success("✅ Document processed and ready for AI tools!")
 
         elif saved_path.suffix.lower() in [".pdf", ".txt", ".docx", ".pptx"]:
             st.warning("No readable text was found in this file.")
@@ -528,60 +610,51 @@ elif page == "📂 Upload Notes":
     else:
         st.info("Please upload a file to continue.")
 
-elif page == "🤖 AI Explanation":
-    st.markdown('<div class="hero-title">AI Explanation</div>', unsafe_allow_html=True)
 
-    st.markdown(
-        """
-        <div class="hero-subtitle">
-            Explain your uploaded notes in simple, beginner-friendly language using Gemini AI.
-        </div>
-        """,
-        unsafe_allow_html=True
+elif page == "🤖 AI Explanation":
+    render_ai_page(
+        "AI Explanation",
+        "Explain uploaded notes in simple, beginner-friendly language.",
+        "explain",
+        "✨ Generate Explanation"
     )
 
-    if st.session_state["extracted_text"]:
-        st.markdown('<div class="section-title">Uploaded Document</div>', unsafe_allow_html=True)
 
-        st.markdown(f"""
-        <div class="premium-card">
-            <div class="card-title">📄 {st.session_state["uploaded_file_name"]}</div>
-            <div class="card-text">
-                Your document is processed and ready for AI explanation.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+elif page == "📝 Summary":
+    render_ai_page(
+        "Smart Summary",
+        "Generate clean summaries, key points, and revision notes.",
+        "summary",
+        "📝 Generate Summary"
+    )
 
-        st.markdown('<div class="section-title">Text Preview</div>', unsafe_allow_html=True)
 
-        st.markdown(
-            f"""
-            <div class="preview-box">
-            {st.session_state["extracted_text"][:2500]}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+elif page == "❓ MCQs":
+    render_ai_page(
+        "MCQ Generator",
+        "Generate exam-style MCQs from uploaded notes.",
+        "mcq",
+        "❓ Generate MCQs"
+    )
 
-        if st.button("✨ Generate AI Explanation"):
-            with st.spinner("Gemini is explaining your notes..."):
-                st.session_state["ai_explanation"] = generate_ai_explanation(
-                    st.session_state["extracted_text"]
-                )
 
-        if st.session_state["ai_explanation"]:
-            st.markdown('<div class="section-title">AI Explanation Output</div>', unsafe_allow_html=True)
-            st.markdown(
-                f"""
-                <div class="ai-output">
-                {st.session_state["ai_explanation"]}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+elif page == "🧠 Flashcards":
+    render_ai_page(
+        "Flashcards",
+        "Create question-answer flashcards for quick revision.",
+        "flashcards",
+        "🧠 Generate Flashcards"
+    )
 
-    else:
-        st.warning("Please upload and process a document first from the Upload Notes page.")
+
+elif page == "🎤 Viva":
+    render_ai_page(
+        "Viva Questions",
+        "Generate viva questions with answers for oral exams.",
+        "viva",
+        "🎤 Generate Viva Questions"
+    )
+
 
 else:
     st.markdown(f'<div class="hero-title">{page}</div>', unsafe_allow_html=True)
