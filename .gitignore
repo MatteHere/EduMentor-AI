@@ -1,7 +1,15 @@
-venv/
-.env
+# Python
 __pycache__/
 *.pyc
+
+# Virtual Environment
+venv/
+
+# Environment Variables
+.env
+
+# Uploaded Files
 data/uploads/
-data/cache/
-.streamlit/secrets.toml
+
+# VS Code
+.vscode/

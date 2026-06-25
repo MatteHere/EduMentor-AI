@@ -1,9 +1,15 @@
-import streamlit as st
-from pathlib import Path
+import os
 import re
+from pathlib import Path
+
 import pdfplumber
+import streamlit as st
 from docx import Document
+from dotenv import load_dotenv
+from google import genai
 from pptx import Presentation
+
+load_dotenv()
 
 st.set_page_config(
     page_title="EduMentor AI",
@@ -121,6 +127,25 @@ st.markdown("""
     line-height: 1.7;
 }
 
+.ai-output {
+    background: #FFFFFF;
+    border-left: 6px solid #10B981;
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 14px 35px rgba(15,23,42,0.08);
+    color: #0F172A;
+    line-height: 1.8;
+}
+
+.ai-output h1, .ai-output h2, .ai-output h3 {
+    color: #0F172A;
+}
+
+.ai-output p, .ai-output li {
+    color: #334155;
+    font-size: 17px;
+}
+
 [data-testid="stAlert"] {
     border-radius: 16px;
     border: 1px solid rgba(16,185,129,0.35);
@@ -190,7 +215,6 @@ def clean_text(text):
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = "\n".join(line.strip() for line in text.split("\n"))
-
     return text.strip()
 
 
@@ -255,6 +279,78 @@ def process_document(file_path):
         text = ""
 
     return clean_text(text)
+
+
+def generate_ai_explanation(text):
+    api_key = os.getenv("GEMINI_API_KEY")
+
+    if not api_key:
+        return "❌ Gemini API key not found. Please add GEMINI_API_KEY to your .env file."
+
+    client = genai.Client(api_key=api_key)
+
+    safe_text = text[:12000]
+
+    prompt = f"""
+You are EduMentor AI, an expert AI learning assistant for Indian university students.
+
+Your task:
+Explain the uploaded notes in simple, beginner-friendly language.
+
+Rules:
+- Do NOT just repeat the notes.
+- Explain concepts clearly.
+- Use simple language suitable for college students.
+- Add real-life examples.
+- Add exam-oriented points.
+- Add important definitions.
+- Add key takeaways.
+- Organize the answer with clear headings.
+- If the notes contain multiple topics, explain them topic-wise.
+
+Format the answer like this:
+
+# Topic Overview
+Explain what the uploaded notes are mainly about.
+
+# Simple Explanation
+Explain the concepts in easy language.
+
+# Important Concepts
+List and explain important concepts.
+
+# Real-Life Examples
+Give examples where useful.
+
+# Exam Tips
+Mention what students should remember for exams.
+
+# Quick Revision Points
+Give short bullet points for revision.
+
+Uploaded Notes:
+{safe_text}
+"""
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        return response.text
+
+    except Exception as error:
+        return f"❌ Gemini error: {error}"
+
+
+if "extracted_text" not in st.session_state:
+    st.session_state["extracted_text"] = ""
+
+if "uploaded_file_name" not in st.session_state:
+    st.session_state["uploaded_file_name"] = ""
+
+if "ai_explanation" not in st.session_state:
+    st.session_state["ai_explanation"] = ""
 
 
 st.sidebar.markdown("## 🎓 EduMentor AI")
@@ -404,6 +500,10 @@ elif page == "📂 Upload Notes":
             extracted_text = process_document(saved_path)
 
         if extracted_text:
+            st.session_state["extracted_text"] = extracted_text
+            st.session_state["uploaded_file_name"] = uploaded_file.name
+            st.session_state["ai_explanation"] = ""
+
             st.markdown('<div class="section-title">Cleaned Text Preview</div>', unsafe_allow_html=True)
 
             preview_text = extracted_text[:4000]
@@ -417,7 +517,7 @@ elif page == "📂 Upload Notes":
                 unsafe_allow_html=True
             )
 
-            st.success("✅ Document processed and cleaned successfully!")
+            st.success("✅ Document processed and stored for AI Explanation!")
 
         elif saved_path.suffix.lower() in [".pdf", ".txt", ".docx", ".pptx"]:
             st.warning("No readable text was found in this file.")
@@ -427,6 +527,61 @@ elif page == "📂 Upload Notes":
 
     else:
         st.info("Please upload a file to continue.")
+
+elif page == "🤖 AI Explanation":
+    st.markdown('<div class="hero-title">AI Explanation</div>', unsafe_allow_html=True)
+
+    st.markdown(
+        """
+        <div class="hero-subtitle">
+            Explain your uploaded notes in simple, beginner-friendly language using Gemini AI.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if st.session_state["extracted_text"]:
+        st.markdown('<div class="section-title">Uploaded Document</div>', unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div class="premium-card">
+            <div class="card-title">📄 {st.session_state["uploaded_file_name"]}</div>
+            <div class="card-text">
+                Your document is processed and ready for AI explanation.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="section-title">Text Preview</div>', unsafe_allow_html=True)
+
+        st.markdown(
+            f"""
+            <div class="preview-box">
+            {st.session_state["extracted_text"][:2500]}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        if st.button("✨ Generate AI Explanation"):
+            with st.spinner("Gemini is explaining your notes..."):
+                st.session_state["ai_explanation"] = generate_ai_explanation(
+                    st.session_state["extracted_text"]
+                )
+
+        if st.session_state["ai_explanation"]:
+            st.markdown('<div class="section-title">AI Explanation Output</div>', unsafe_allow_html=True)
+            st.markdown(
+                f"""
+                <div class="ai-output">
+                {st.session_state["ai_explanation"]}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    else:
+        st.warning("Please upload and process a document first from the Upload Notes page.")
 
 else:
     st.markdown(f'<div class="hero-title">{page}</div>', unsafe_allow_html=True)
