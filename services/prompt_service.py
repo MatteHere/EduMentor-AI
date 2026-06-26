@@ -2,88 +2,152 @@ PROMPTS = {
     "explain": """
 You are EduMentor AI, an expert AI tutor for Indian university students.
 
-Create a clear, beginner-friendly explanation using proper Markdown.
+Your task is to explain the uploaded notes in a simple, beginner-friendly way.
+
+Return the response in Markdown.
 
 Format:
+
 # 📘 Topic Overview
+
+Brief introduction.
+
 # 🧠 Simple Explanation
+
+Explain every important concept in easy language.
+
 # 🔑 Important Concepts
+
+Use bullet points.
+
 # 📝 Exam Tips
-# ⚡ Quick Revision Points
+
+Mention important points for university exams.
+
+# ⚡ Quick Revision
+
+Provide a concise revision summary.
 """,
 
     "summary": """
-Create a clean exam-focused summary using proper Markdown.
+Create a high-quality exam summary.
+
+Return Markdown only.
 
 Format:
-# 📝 Short Summary
-# 📚 Detailed Summary
-# 🔑 Key Points
-# 📌 Important Terms
-# ⚡ Quick Revision Notes
+
+# 📝 Summary
+
+# 📚 Key Concepts
+
+# 📌 Important Definitions
+
+# 🎯 Exam Points
+
+# ⚡ One Minute Revision
 """,
 
     "mcq": """
-Generate 15 MCQs from the uploaded notes using proper Markdown.
+Generate exactly 10 multiple choice questions.
 
-Format:
-# ❓ MCQs
+Return ONLY valid JSON.
 
-## Question 1
+Do NOT return Markdown.
+Do NOT return explanations outside JSON.
 
-**Question:**  
+Expected JSON:
 
-**Options:**  
-A)  
-B)  
-C)  
-D)  
-
-**Correct Answer:**  
-
-**Explanation:**  
+{
+  "questions": [
+    {
+      "question": "Question text",
+      "options": {
+        "A": "Option A",
+        "B": "Option B",
+        "C": "Option C",
+        "D": "Option D"
+      },
+      "answer": "A",
+      "explanation": "Why A is correct."
+    }
+  ]
+}
 """,
 
     "flashcards": """
-Create flashcards from the uploaded notes using proper Markdown.
+Generate study flashcards from the uploaded notes.
 
-Format:
-# 🧠 Flashcards
+Return ONLY valid JSON.
 
-## Flashcard 1
+Do NOT return Markdown.
+Do NOT return explanations outside JSON.
 
-**Question:**  
+Expected JSON:
 
-**Answer:**  
-
-**Key Point:**  
+{
+  "flashcards": [
+    {
+      "question": "Front side of flashcard",
+      "answer": "Back side of flashcard",
+      "key_point": "Short revision point"
+    }
+  ]
+}
 """,
 
     "viva": """
-Generate viva questions and answers from the uploaded notes using proper Markdown.
+Generate viva questions and answers.
+
+Return Markdown.
 
 Format:
+
 # 🎤 Viva Questions
 
 ## Question 1
 
-**Question:**  
+**Question**
 
-**Answer:**  
+**Answer**
 
-**Important Point:**  
+**Explanation**
 
-# 📌 Important Viva Topics
+Repeat for multiple questions.
+
+Finish with:
+
+# 📌 Viva Tips
+""",
+
+    "resources": """
+Recommend FREE study resources related to the uploaded document.
+
+Return Markdown.
+
+Include:
+
+# 📚 YouTube Channels
+
+# 🎓 Free Courses
+
+# 🌐 Websites
+
+# 📖 Books
+
+# 💻 Practice Platforms
+
+For every resource, explain why it is useful.
 """
 }
 
 
-def build_prompt(mode, text):
-    safe_text = text[:10000]
+def build_prompt(mode, extracted_text):
+    extracted_text = extracted_text[:10000]
 
     return f"""
 {PROMPTS[mode]}
 
 Uploaded Notes:
-{safe_text}
+
+{extracted_text}
 """
