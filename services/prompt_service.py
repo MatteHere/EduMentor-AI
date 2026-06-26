@@ -96,27 +96,24 @@ Expected JSON:
 """,
 
     "viva": """
-Generate viva questions and answers.
+Generate exactly 10 viva questions from the uploaded notes.
 
-Return Markdown.
+Return ONLY valid JSON.
 
-Format:
+Do NOT return Markdown.
+Do NOT return explanations outside JSON.
 
-# 🎤 Viva Questions
+Expected JSON:
 
-## Question 1
-
-**Question**
-
-**Answer**
-
-**Explanation**
-
-Repeat for multiple questions.
-
-Finish with:
-
-# 📌 Viva Tips
+{
+  "viva_questions": [
+    {
+      "question": "What is Machine Learning?",
+      "answer": "Machine Learning is a subset of AI that enables systems to learn from data.",
+      "explanation": "Explain the answer clearly"
+    }
+  ]
+}
 """,
 
     "resources": """

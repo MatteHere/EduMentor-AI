@@ -54,11 +54,36 @@ def validate_flashcard_data(data):
     return True
 
 
+def validate_viva_data(data):
+    if not isinstance(data, dict):
+        return False
+
+    viva_questions = data.get("viva_questions")
+
+    if not isinstance(viva_questions, list) or not viva_questions:
+        return False
+
+    for viva in viva_questions:
+        if not isinstance(viva, dict):
+            return False
+
+        required_keys = ["question", "answer", "explanation"]
+
+        for key in required_keys:
+            if key not in viva:
+                return False
+
+    return True
+
+
 def validate_structured_data(mode, data):
     if mode == "mcq":
         return validate_mcq_data(data)
 
     if mode == "flashcards":
         return validate_flashcard_data(data)
+
+    if mode == "viva":
+        return validate_viva_data(data)
 
     return True

@@ -9,7 +9,7 @@ from services.aiengine.cache import (
 )
 
 
-STRUCTURED_MODES = ["mcq", "flashcards"]
+STRUCTURED_MODES = ["mcq", "flashcards", "viva"]
 
 
 def build_retry_text(mode, extracted_text):

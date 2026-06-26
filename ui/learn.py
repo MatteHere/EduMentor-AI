@@ -2,8 +2,10 @@ import streamlit as st
 
 from services.aiengine.engine import AIEngine
 from services.aiengine.parser import parse_response
+
 from ui.learn_components.mcq_view import render_mcq_quiz
 from ui.learn_components.flashcard_view import render_flashcards
+from ui.learn_components.viva_view import render_viva_questions
 
 
 LEARN_TOOLS = {
@@ -55,12 +57,15 @@ def render_document_header():
             </div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
 
 def render_tool_grid():
-    st.markdown('<div class="section-title">Choose Learning Mode</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-title">Choose Learning Mode</div>',
+        unsafe_allow_html=True,
+    )
 
     columns = st.columns(3)
     modes = list(LEARN_TOOLS.keys())
@@ -77,7 +82,7 @@ def render_tool_grid():
                     <div class="card-text">{config["description"]}</div>
                 </div>
                 """,
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
 
             if st.button(config["title"], key=f"select_learn_tool_{mode}"):
@@ -94,6 +99,10 @@ def reset_interactive_state(mode):
     if mode == "flashcards":
         st.session_state["flashcard_index"] = 0
         st.session_state["flashcard_show_answer"] = False
+
+    if mode == "viva":
+        st.session_state["viva_index"] = 0
+        st.session_state["viva_show_answer"] = False
 
 
 def generate_with_engine(mode):
@@ -123,11 +132,12 @@ def generate_with_engine(mode):
     if not result.get("success"):
         st.session_state["ai_errors"][mode] = result.get(
             "error",
-            "Something went wrong while generating content."
+            "Something went wrong while generating content.",
         )
         return
 
     st.session_state["ai_errors"].pop(mode, None)
+
     st.session_state["ai_outputs"][mode] = {
         "raw": result.get("raw"),
         "structured": result.get("structured"),
@@ -184,9 +194,23 @@ def render_generated_output(mode):
 
         return
 
+    if mode == "viva":
+        viva_data = structured
+
+        if viva_data is None:
+            viva_data = parse_response("viva", raw)
+
+        if viva_data:
+            render_viva_questions(viva_data)
+        else:
+            st.warning("Viva data could not be converted into interactive format.")
+            st.markdown(raw)
+
+        return
+
     st.markdown(
         '<div class="section-title">Generated Output</div>',
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
     st.markdown(raw)
 
@@ -202,7 +226,7 @@ def render_active_tool():
             <div class="card-text">{config["description"]}</div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     if st.button(config["button"], key=f"generate_active_tool_{mode}"):
@@ -221,7 +245,7 @@ def render_learn_page():
             MCQs, flashcards, viva questions, and resources.
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     if "active_learn_tool" not in st.session_state:
