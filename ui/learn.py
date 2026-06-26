@@ -1,10 +1,9 @@
-import json
-
 import streamlit as st
 
-from services.ai_service import generate_ai_response
-from services.database_service import get_ai_output, save_ai_output
-from services.json_service import extract_json_from_text, is_valid_mcq_json
+from services.aiengine.engine import AIEngine
+from services.aiengine.parser import parse_response
+from ui.learn_components.mcq_view import render_mcq_quiz
+from ui.learn_components.flashcard_view import render_flashcards
 
 
 LEARN_TOOLS = {
@@ -25,7 +24,7 @@ LEARN_TOOLS = {
     },
     "flashcards": {
         "title": "🃏 Flashcards",
-        "description": "Create question-answer cards for fast revision.",
+        "description": "Create interactive question-answer revision cards.",
         "button": "Generate Flashcards",
     },
     "viva": {
@@ -43,59 +42,6 @@ LEARN_TOOLS = {
 
 def set_active_tool(mode):
     st.session_state["active_learn_tool"] = mode
-
-
-def load_cached_output(document_id, mode):
-    cached = get_ai_output(document_id, mode)
-
-    if cached:
-        output_text, provider, created_at = cached
-        return output_text, provider, created_at
-
-    return None, None, None
-
-
-def generate_or_load_output(mode):
-    document_id = st.session_state.get("document_id")
-    extracted_text = st.session_state.get("extracted_text", "")
-    provider = st.session_state.get("selected_provider", "auto")
-
-    if not document_id:
-        st.warning("Please select a document from Workspace first.")
-        return
-
-    cached_output, cached_provider, created_at = load_cached_output(document_id, mode)
-
-    if cached_output:
-        st.session_state["ai_outputs"][mode] = cached_output
-        st.session_state["ai_errors"].pop(mode, None)
-        st.success(f"✅ Loaded from cache. Provider: {cached_provider}. Created: {created_at}")
-        return
-
-    if not extracted_text:
-        st.warning("No readable text found for this document.")
-        return
-
-    with st.spinner("EduMentor AI is generating your study material..."):
-        success, response = generate_ai_response(
-            mode,
-            extracted_text,
-            provider=provider
-        )
-
-    if success:
-        save_ai_output(
-            document_id=document_id,
-            mode=mode,
-            output_text=response,
-            provider=provider
-        )
-
-        st.session_state["ai_outputs"][mode] = response
-        st.session_state["ai_errors"].pop(mode, None)
-        st.success("✅ Generated and saved.")
-    else:
-        st.session_state["ai_errors"][mode] = response
 
 
 def render_document_header():
@@ -116,19 +62,12 @@ def render_document_header():
 def render_tool_grid():
     st.markdown('<div class="section-title">Choose Learning Mode</div>', unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns(3)
-
+    columns = st.columns(3)
     modes = list(LEARN_TOOLS.keys())
 
     for index, mode in enumerate(modes):
         config = LEARN_TOOLS[mode]
-
-        if index % 3 == 0:
-            column = col1
-        elif index % 3 == 1:
-            column = col2
-        else:
-            column = col3
+        column = columns[index % 3]
 
         with column:
             st.markdown(
@@ -146,106 +85,110 @@ def render_tool_grid():
                 st.rerun()
 
 
-def render_mcq_quiz(raw_output):
-    data = extract_json_from_text(raw_output)
+def reset_interactive_state(mode):
+    if mode == "mcq":
+        st.session_state["mcq_answers"] = {}
+        st.session_state["mcq_submitted"] = False
+        st.session_state["mcq_score"] = 0
 
-    if not is_valid_mcq_json(data):
-        st.warning("The MCQ output could not be converted into quiz format.")
-        st.markdown(raw_output)
+    if mode == "flashcards":
+        st.session_state["flashcard_index"] = 0
+        st.session_state["flashcard_show_answer"] = False
+
+
+def generate_with_engine(mode):
+    document_id = st.session_state.get("document_id")
+    extracted_text = st.session_state.get("extracted_text", "")
+    provider = st.session_state.get("selected_provider", "auto")
+
+    if not document_id:
+        st.warning("Please select a document from Workspace first.")
         return
 
-    questions = data["questions"]
+    if not extracted_text:
+        st.warning("No readable text found for this document.")
+        return
 
-    st.markdown('<div class="section-title">Interactive MCQ Quiz</div>', unsafe_allow_html=True)
+    reset_interactive_state(mode)
 
-    if "mcq_answers" not in st.session_state:
-        st.session_state["mcq_answers"] = {}
-
-    if "mcq_submitted" not in st.session_state:
-        st.session_state["mcq_submitted"] = False
-
-    if st.button("🔄 Reset Quiz", key="reset_mcq_quiz"):
-        st.session_state["mcq_answers"] = {}
-        st.session_state["mcq_submitted"] = False
-        st.rerun()
-
-    for index, question in enumerate(questions):
-        st.markdown(
-            f"""
-            <div class="premium-card">
-                <div class="card-title">Question {index + 1}</div>
-                <div class="card-text">{question["question"]}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
+    with st.spinner("EduMentor AI is preparing your learning material..."):
+        result = AIEngine.generate(
+            mode=mode,
+            document_id=document_id,
+            extracted_text=extracted_text,
+            provider=provider,
+            use_cache=True,
         )
 
-        selected = st.radio(
-            "Choose your answer",
-            ["A", "B", "C", "D"],
-            format_func=lambda option: f"{option}) {question['options'][option]}",
-            key=f"mcq_question_{index}",
-            index=None,
-            disabled=st.session_state["mcq_submitted"]
+    if not result.get("success"):
+        st.session_state["ai_errors"][mode] = result.get(
+            "error",
+            "Something went wrong while generating content."
         )
+        return
 
-        if selected:
-            st.session_state["mcq_answers"][index] = selected
+    st.session_state["ai_errors"].pop(mode, None)
+    st.session_state["ai_outputs"][mode] = {
+        "raw": result.get("raw"),
+        "structured": result.get("structured"),
+        "cached": result.get("cached"),
+        "provider": result.get("provider"),
+    }
 
-        if st.session_state["mcq_submitted"]:
-            correct_answer = question["answer"]
-            user_answer = st.session_state["mcq_answers"].get(index)
-
-            if user_answer == correct_answer:
-                st.success(f"✅ Correct Answer: {correct_answer}")
-            else:
-                st.error(f"❌ Your Answer: {user_answer or 'Not answered'} | Correct Answer: {correct_answer}")
-
-            st.info(question["explanation"])
-
-    if not st.session_state["mcq_submitted"]:
-        if st.button("✅ Submit Quiz", key="submit_mcq_quiz"):
-            score = 0
-
-            for index, question in enumerate(questions):
-                if st.session_state["mcq_answers"].get(index) == question["answer"]:
-                    score += 1
-
-            st.session_state["mcq_score"] = score
-            st.session_state["mcq_submitted"] = True
-            st.rerun()
-
-    if st.session_state["mcq_submitted"]:
-        score = st.session_state.get("mcq_score", 0)
-        total = len(questions)
-
-        st.markdown(
-            f"""
-            <div class="premium-card">
-                <div class="card-title">🏆 Final Score</div>
-                <div class="card-text">
-                    You scored <b>{score} / {total}</b>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    if result.get("cached"):
+        st.success(f"✅ Loaded from cache. Provider: {result.get('provider')}")
+    else:
+        st.success(f"✅ Generated and saved. Provider: {result.get('provider')}")
 
 
-def render_output(mode):
-    if st.session_state["ai_errors"].get(mode):
-        st.warning(st.session_state["ai_errors"][mode])
+def render_generated_output(mode):
+    error = st.session_state["ai_errors"].get(mode)
+
+    if error:
+        st.warning(error)
+        return
 
     output = st.session_state["ai_outputs"].get(mode)
 
     if not output:
         return
 
+    raw = output.get("raw")
+    structured = output.get("structured")
+
     if mode == "mcq":
-        render_mcq_quiz(output)
-    else:
-        st.markdown('<div class="section-title">Generated Output</div>', unsafe_allow_html=True)
-        st.markdown(output)
+        mcq_data = structured
+
+        if mcq_data is None:
+            mcq_data = parse_response("mcq", raw)
+
+        if mcq_data:
+            render_mcq_quiz(mcq_data)
+        else:
+            st.warning("MCQ data could not be converted into interactive quiz format.")
+            st.markdown(raw)
+
+        return
+
+    if mode == "flashcards":
+        flashcard_data = structured
+
+        if flashcard_data is None:
+            flashcard_data = parse_response("flashcards", raw)
+
+        if flashcard_data:
+            render_flashcards(flashcard_data)
+        else:
+            st.warning("Flashcard data could not be converted into interactive format.")
+            st.markdown(raw)
+
+        return
+
+    st.markdown(
+        '<div class="section-title">Generated Output</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(raw)
 
 
 def render_active_tool():
@@ -263,14 +206,9 @@ def render_active_tool():
     )
 
     if st.button(config["button"], key=f"generate_active_tool_{mode}"):
-        if mode == "mcq":
-            st.session_state["mcq_answers"] = {}
-            st.session_state["mcq_submitted"] = False
-            st.session_state["mcq_score"] = 0
+        generate_with_engine(mode)
 
-        generate_or_load_output(mode)
-
-    render_output(mode)
+    render_generated_output(mode)
 
 
 def render_learn_page():
@@ -288,6 +226,12 @@ def render_learn_page():
 
     if "active_learn_tool" not in st.session_state:
         st.session_state["active_learn_tool"] = "explain"
+
+    if "ai_outputs" not in st.session_state:
+        st.session_state["ai_outputs"] = {}
+
+    if "ai_errors" not in st.session_state:
+        st.session_state["ai_errors"] = {}
 
     if not st.session_state.get("document_id") or not st.session_state.get("extracted_text"):
         st.warning("Please go to Workspace, open a unit, choose a document, and click 📚 Learn.")
