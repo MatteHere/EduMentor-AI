@@ -4,7 +4,7 @@ from pathlib import Path
 import pdfplumber
 from docx import Document
 from pptx import Presentation
-
+from services.database_service import save_document
 
 UPLOAD_FOLDER = Path("data/uploads")
 
@@ -109,3 +109,28 @@ def process_document(file_path):
         text = ""
 
     return clean_text(text)
+def upload_document_to_unit(uploaded_file, unit_id):
+    if uploaded_file is None:
+        return False, "No file selected.", None
+
+    if not unit_id:
+        return False, "No unit selected.", None
+
+    try:
+        saved_path = save_uploaded_file(uploaded_file)
+        extracted_text = process_document(saved_path)
+
+        if not extracted_text:
+            return False, "No readable text was found in this document.", None
+
+        document_id = save_document(
+            unit_id,
+            uploaded_file.name,
+            saved_path,
+            extracted_text
+        )
+
+        return True, "Document uploaded and saved successfully.", document_id
+
+    except Exception as error:
+        return False, f"Document upload failed: {error}", None
