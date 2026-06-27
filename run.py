@@ -7,16 +7,19 @@ from services.provider_manager import get_default_provider
 from ui.dashboard import render_dashboard
 from ui.workspace import render_workspace_page
 from ui.learn import render_learn_page
+from ui.chat import render_chat_page
 from ui.settings import render_settings_page
+
 
 load_dotenv()
 initialize_database()
+
 
 st.set_page_config(
     page_title="EduMentor AI",
     page_icon="🎓",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 
@@ -42,10 +45,24 @@ def initialize_session_state():
         "delete_subject_id": None,
         "delete_subject_name": "",
 
+        "delete_unit_id": None,
+        "delete_unit_name": "",
+
+        "edit_unit_id": None,
+
+        "delete_document_id": None,
+        "delete_document_name": "",
+
+        "edit_document_id": None,
+
         "selected_provider": get_default_provider(),
+
+        "active_learn_tool": "explain",
 
         "ai_outputs": {},
         "ai_errors": {},
+
+        "chat_messages": [],
     }
 
     for key, value in defaults.items():
@@ -54,6 +71,7 @@ def initialize_session_state():
 
 
 initialize_session_state()
+
 
 st.markdown("""
 <style>
@@ -166,6 +184,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
 st.sidebar.title("🎓 EduMentor AI")
 st.sidebar.caption("AI Learning Platform")
 st.sidebar.divider()
@@ -176,12 +195,14 @@ page = st.sidebar.radio(
         "🏠 Dashboard",
         "📂 Workspace",
         "🧠 Learn",
+        "💬 AI Chat",
         "📅 Study Planner",
         "📈 Progress",
         "🎓 University Hub",
         "⚙ Settings",
-    ]
+    ],
 )
+
 
 if page == "🏠 Dashboard":
     render_dashboard()
@@ -191,6 +212,9 @@ elif page == "📂 Workspace":
 
 elif page == "🧠 Learn":
     render_learn_page()
+
+elif page == "💬 AI Chat":
+    render_chat_page()
 
 elif page == "⚙ Settings":
     render_settings_page()
