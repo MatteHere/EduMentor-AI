@@ -8,6 +8,9 @@ from ui.dashboard import render_dashboard
 from ui.workspace import render_workspace_page
 from ui.learn import render_learn_page
 from ui.chat import render_chat_page
+from ui.planner import render_planner_page
+from ui.progress import render_progress_page
+from ui.university import render_university_page
 from ui.settings import render_settings_page
 
 
@@ -216,17 +219,14 @@ elif page == "🧠 Learn":
 elif page == "💬 AI Chat":
     render_chat_page()
 
-elif page == "⚙ Settings":
-    render_settings_page()
-
 elif page == "📅 Study Planner":
-    st.markdown('<div class="hero-title">Study Planner</div>', unsafe_allow_html=True)
-    st.info("🚧 Coming in Phase 2")
+    render_planner_page()
 
 elif page == "📈 Progress":
-    st.markdown('<div class="hero-title">Progress</div>', unsafe_allow_html=True)
-    st.info("🚧 Coming in Phase 2")
+    render_progress_page()
 
 elif page == "🎓 University Hub":
-    st.markdown('<div class="hero-title">University Hub</div>', unsafe_allow_html=True)
-    st.info("🚧 Coming in Phase 4")
+    render_university_page()
+
+elif page == "⚙ Settings":
+    render_settings_page()
